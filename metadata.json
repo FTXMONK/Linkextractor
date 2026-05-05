@@ -1,0 +1,6 @@
+{
+  "name": "Link Extractor",
+  "description": "A high-fidelity media processor for extracting MP3 and MP4 from URLs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
