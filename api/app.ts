@@ -23,69 +23,69 @@ app.post('/api/process', async (req, res) => {
       : "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=250&auto=format&fit=crop";
 
   try {
-    // Media processing using Cobalt API (reliable and handles various sources)
-    const cobaltResponse = await fetch('https://api.cobalt.tools/api/json', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        url: url,
-        videoQuality: '720',
-        filenameStyle: 'basic'
-      })
-    });
+    const instances = [
+      'https://api.cobalt.tools/api/json',
+      'https://cobalt.shavit.xyz/api/json',
+      'https://cobalt.ayaya.one/api/json'
+    ];
 
-    if (cobaltResponse.ok) {
-      const data = await cobaltResponse.json();
-      
-      // If cobalt returns a stream or link
-      if (data.status === 'stream' || data.status === 'success' || data.status === 'redirect') {
-        return res.json({
-          success: true,
-          data: {
-            id: Math.random().toString(36).substring(7),
-            title: "Extracted Media", // Frontend AI will override this
-            thumbnail,
-            mp3: {
-              url: data.url, // Usually cobalt returns the best matching for the request
-              size: "Unknown",
-              quality: "High"
-            },
-            mp4: {
-              url: data.url,
-              size: "Unknown",
-              quality: "720p"
-            }
-          }
+    let data = null;
+    let lastError = null;
+
+    for (const api of instances) {
+      try {
+        const cobaltResponse = await fetch(api, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            url: url,
+            videoQuality: '1080',
+            filenameStyle: 'basic',
+            downloadMode: 'auto'
+          })
         });
+
+        if (cobaltResponse.ok) {
+          data = await cobaltResponse.json();
+          if (data.status === 'stream' || data.status === 'success' || data.status === 'redirect') {
+            break;
+          }
+        }
+      } catch (e) {
+        lastError = e;
+        continue;
       }
     }
 
-    // Fallback if Cobalt fails
-    const id = Math.random().toString(36).substring(7);
-    res.json({
-      success: true,
-      data: {
-        id,
-        title: "Extracted Media",
-        thumbnail,
-        mp3: {
-          url: `https://yt-download.org/api/button/mp3/${ytId || 'default'}`,
-          size: "Variable",
-          quality: "320kbps"
-        },
-        mp4: {
-          url: `https://yt-download.org/api/button/videos/${ytId || 'default'}`,
-          size: "Variable",
-          quality: "HD"
+    if (data && (data.status === 'stream' || data.status === 'success' || data.status === 'redirect')) {
+      return res.json({
+        success: true,
+        data: {
+          id: Math.random().toString(36).substring(7),
+          title: "Extracted Media",
+          thumbnail,
+          mp3: {
+            url: data.url,
+            size: "Original",
+            quality: "Best"
+          },
+          mp4: {
+            url: data.url,
+            size: "Original",
+            quality: "1080p"
+          }
         }
-      }
-    });
-  } catch (error) {
+      });
+    }
+
+    // Fail gracefully if no reputable service works
+    throw new Error('All secure processing instances are currently busy. Please try again in a few minutes.');
+  } catch (error: any) {
     console.error("Processing API Error:", error);
-    res.status(500).json({ error: "Media processing server is unavailable" });
+    res.status(503).json({ error: error.message || "Media processing server is temporarily unavailable. We use secure, ad-free services only." });
   }
 });
 
