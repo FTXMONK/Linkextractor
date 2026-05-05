@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Link2, Music, Video, Copy, Check, Loader2, Download, AlertCircle } from 'lucide-react';
+import { Link2, Music, Video, Copy, Check, Loader2, Download, AlertCircle, Sparkles, Globe } from 'lucide-react';
+import { GoogleGenAI, Type } from "@google/genai";
 
 interface MediaInfo {
   id: string;
@@ -25,12 +26,28 @@ export default function App() {
   const [error, setError] = React.useState<string | null>(null);
   const [copiedType, setCopiedType] = React.useState<'mp3' | 'mp4' | null>(null);
 
-  const validateUrl = (string: string) => {
+  // Initialize Gemini
+  const ai = React.useMemo(() => new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }), []);
+
+  const getYouTubeId = (url: string) => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  };
+
+  const extractMetadataWithAI = async (mediaUrl: string) => {
     try {
-      new URL(string);
-      return true;
-    } catch (_) {
-      return false;
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Extract the video title for this URL: ${mediaUrl}. Return only the title as a plain string. If you can't determine it, return "Processed Media".`,
+        config: {
+          temperature: 0.1,
+        }
+      });
+      return response.text?.trim() || "Processed Media";
+    } catch (err) {
+      console.error("AI Title Extraction failed:", err);
+      return "Processed Media";
     }
   };
 
@@ -39,12 +56,15 @@ export default function App() {
     setError(null);
 
     if (!url) {
-      setError('Please enter a URL');
+      setError('Please enter a media URL');
       return;
     }
 
-    if (!validateUrl(url)) {
-      setError('Please enter a valid URL');
+    const isYoutube = getYouTubeId(url);
+    const isValid = /^https?:\/\/.*/.test(url);
+
+    if (!isValid) {
+      setError('Please enter a valid URL starting with http:// or https://');
       return;
     }
 
@@ -52,6 +72,16 @@ export default function App() {
     setResult(null);
 
     try {
+      // Step 1: AI Metadata Extraction
+      const title = await extractMetadataWithAI(url);
+      
+      // Step 2: Thumbnail Selection
+      let thumbnail = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=250&auto=format&fit=crop";
+      if (isYoutube) {
+        thumbnail = `https://img.youtube.com/vi/${isYoutube}/maxresdefault.jpg`;
+      }
+
+      // Step 3: Mock Backend for download links (preserving architecture)
       const response = await fetch('/api/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -61,9 +91,15 @@ export default function App() {
       if (!response.ok) throw new Error('Processing failed');
 
       const { data } = await response.json();
-      setResult(data);
+      
+      // Merge AI Metadata with Backend structure
+      setResult({
+        ...data,
+        title,
+        thumbnail
+      });
     } catch (err) {
-      setError('Something went wrong. Please try again.');
+      setError('Failed to process URL. The service might be temporarily busy.');
     } finally {
       setIsProcessing(false);
     }
