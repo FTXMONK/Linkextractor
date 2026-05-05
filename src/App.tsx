@@ -25,6 +25,15 @@ export default function App() {
   const [result, setResult] = React.useState<MediaInfo | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [copiedType, setCopiedType] = React.useState<'mp3' | 'mp4' | null>(null);
+  const [serverStatus, setServerStatus] = React.useState<'checking' | 'ok' | 'fail'>('checking');
+
+  // Check server health on mount
+  React.useEffect(() => {
+    fetch('/api/health')
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(() => setServerStatus('ok'))
+      .catch(() => setServerStatus('fail'));
+  }, []);
 
   // Initialize Gemini
   const ai = React.useMemo(() => {
@@ -120,6 +129,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#E5E5E5] selection:bg-indigo-500/30 relative overflow-x-hidden">
+      {/* Dev Status Indicator */}
+      <div className="fixed bottom-4 left-4 z-[100] px-2 py-1 rounded text-[10px] font-mono bg-white/5 border border-white/10 flex items-center gap-2">
+        <div className={`w-2 h-2 rounded-full ${serverStatus === 'ok' ? 'bg-emerald-500' : serverStatus === 'fail' ? 'bg-red-500' : 'bg-amber-500'}`}></div>
+        API Connection: {serverStatus.toUpperCase()}
+      </div>
+
       {/* Background Subtle Glows */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-900/10 rounded-full blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-900/10 rounded-full blur-[120px] pointer-events-none"></div>

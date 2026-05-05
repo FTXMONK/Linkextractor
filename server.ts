@@ -2,6 +2,7 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import cors from 'cors';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,12 +11,18 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.use(cors());
   app.use(express.json());
+
+  // Health check
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', environment: process.env.NODE_ENV || 'development' });
+  });
 
   // API Route: Process URL
   app.post('/api/process', async (req, res) => {
     const { url } = req.body;
-    console.log(`[API] Processing request for URL: ${url}`);
+    console.log(`[API] Received request: POST /api/process with url: ${url}`);
 
     if (!url) {
       return res.status(400).json({ error: 'URL is required' });
@@ -44,6 +51,12 @@ async function startServer() {
         }
       }
     });
+  });
+
+  // Catch-all for API 404s
+  app.all('/api/*', (req, res) => {
+    console.warn(`[API] 404 Not Found: ${req.method} ${req.url}`);
+    res.status(404).json({ error: `Route ${req.method} ${req.url} not found` });
   });
 
   // Vite middleware for development
