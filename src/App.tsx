@@ -61,8 +61,9 @@ export default function App() {
       return;
     }
 
-    const isYoutube = getYouTubeId(url);
-    const isValid = /^https?:\/\/.*/.test(url);
+    const trimmedUrl = url.trim();
+    const isYoutube = getYouTubeId(trimmedUrl);
+    const isValid = /^https?:\/\/.*/.test(trimmedUrl);
 
     if (!isValid) {
       setError('Please enter a valid URL starting with http:// or https://');
@@ -74,7 +75,7 @@ export default function App() {
 
     try {
       // Step 1: AI Metadata Extraction
-      const title = await extractMetadataWithAI(url);
+      const title = await extractMetadataWithAI(trimmedUrl);
       
       // Step 2: Thumbnail Selection
       let thumbnail = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=250&auto=format&fit=crop";
@@ -87,10 +88,13 @@ export default function App() {
       const response = await fetch('/api/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: trimmedUrl }),
       });
 
-      if (!response.ok) throw new Error('Processing failed');
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Server responded with ${response.status}`);
+      }
 
       const { data } = await response.json();
       
@@ -100,8 +104,9 @@ export default function App() {
         title,
         thumbnail
       });
-    } catch (err) {
-      setError('Failed to process URL. The service might be temporarily busy.');
+    } catch (err: any) {
+      console.error("Processing error:", err);
+      setError(err.message || 'Failed to process URL. The service might be temporarily busy.');
     } finally {
       setIsProcessing(false);
     }

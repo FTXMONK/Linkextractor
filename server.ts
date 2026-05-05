@@ -15,6 +15,7 @@ async function startServer() {
   // API Route: Process URL
   app.post('/api/process', async (req, res) => {
     const { url } = req.body;
+    console.log(`[API] Processing request for URL: ${url}`);
 
     if (!url) {
       return res.status(400).json({ error: 'URL is required' });
