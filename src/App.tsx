@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link2, Music, Video, Copy, Check, Loader2, Download, AlertCircle, Sparkles, Globe } from 'lucide-react';
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
 interface MediaInfo {
   id: string;
@@ -27,7 +27,10 @@ export default function App() {
   const [copiedType, setCopiedType] = React.useState<'mp3' | 'mp4' | null>(null);
 
   // Initialize Gemini
-  const ai = React.useMemo(() => new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }), []);
+  const ai = React.useMemo(() => {
+    const key = (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) || "";
+    return key ? new GoogleGenAI({ apiKey: key }) : null;
+  }, []);
 
   const getYouTubeId = (url: string) => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -36,15 +39,13 @@ export default function App() {
   };
 
   const extractMetadataWithAI = async (mediaUrl: string) => {
+    if (!ai) return "Processed Media";
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Extract the video title for this URL: ${mediaUrl}. Return only the title as a plain string. If you can't determine it, return "Processed Media".`,
-        config: {
-          temperature: 0.1,
-        }
-      });
-      return response.text?.trim() || "Processed Media";
+      const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const prompt = `Extract the video title for this URL: ${mediaUrl}. Return only the title as a plain string. If you can't determine it, return "Processed Media".`;
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      return response.text().trim() || "Processed Media";
     } catch (err) {
       console.error("AI Title Extraction failed:", err);
       return "Processed Media";
@@ -78,7 +79,8 @@ export default function App() {
       // Step 2: Thumbnail Selection
       let thumbnail = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=250&auto=format&fit=crop";
       if (isYoutube) {
-        thumbnail = `https://img.youtube.com/vi/${isYoutube}/maxresdefault.jpg`;
+        // High quality fallback
+        thumbnail = `https://i.ytimg.com/vi/${isYoutube}/hqdefault.jpg`;
       }
 
       // Step 3: Mock Backend for download links (preserving architecture)
