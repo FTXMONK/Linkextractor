@@ -2,62 +2,13 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import cors from 'cors';
+import app from './api/app.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
-  const app = express();
   const PORT = 3000;
-
-  app.use(cors());
-  app.use(express.json());
-
-  // Health check
-  app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', environment: process.env.NODE_ENV || 'development' });
-  });
-
-  // API Route: Process URL
-  app.post('/api/process', async (req, res) => {
-    const { url } = req.body;
-    console.log(`[API] Received request: POST /api/process with url: ${url}`);
-
-    if (!url) {
-      return res.status(400).json({ error: 'URL is required' });
-    }
-
-    // Mock processing delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Generate mock results
-    const id = Math.random().toString(36).substring(7);
-    res.json({
-      success: true,
-      data: {
-        id,
-        title: "Extracted Media",
-        thumbnail: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=250&auto=format&fit=crop",
-        mp3: {
-          url: `https://example.com/download/${id}.mp3`,
-          size: "4.2 MB",
-          quality: "320kbps"
-        },
-        mp4: {
-          url: `https://example.com/download/${id}.mp4`,
-          size: "24.8 MB",
-          quality: "1080p"
-        }
-      }
-    });
-  });
-
-  // Catch-all for API 404s
-  app.all('/api/*', (req, res) => {
-    console.warn(`[API] 404 Not Found: ${req.method} ${req.url}`);
-    res.status(404).json({ error: `Route ${req.method} ${req.url} not found` });
-  });
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {

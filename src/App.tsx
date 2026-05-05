@@ -25,36 +25,22 @@ export default function App() {
   const [result, setResult] = React.useState<MediaInfo | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [copiedType, setCopiedType] = React.useState<'mp3' | 'mp4' | null>(null);
-  const [serverStatus, setServerStatus] = React.useState<'checking' | 'ok' | 'fail'>('checking');
 
-  // Check server health on mount
-  React.useEffect(() => {
-    fetch('/api/health')
-      .then(res => res.ok ? res.json() : Promise.reject())
-      .then(() => setServerStatus('ok'))
-      .catch(() => setServerStatus('fail'));
-  }, []);
-
-  // Initialize Gemini
+  // Initialize Gemini following @google/genai guidelines
   const ai = React.useMemo(() => {
     const key = (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) || "";
     return key ? new GoogleGenAI({ apiKey: key }) : null;
   }, []);
 
-  const getYouTubeId = (url: string) => {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-  };
-
   const extractMetadataWithAI = async (mediaUrl: string) => {
     if (!ai) return "Processed Media";
     try {
-      const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const prompt = `Extract the video title for this URL: ${mediaUrl}. Return only the title as a plain string. If you can't determine it, return "Processed Media".`;
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      return response.text().trim() || "Processed Media";
+      // Correct usage: ai.models.generateContent
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Extract the video title for this URL: ${mediaUrl}. Return only the title as a plain string. If you can't determine it, return "Processed Media".`,
+      });
+      return response.text?.trim() || "Processed Media";
     } catch (err) {
       console.error("AI Title Extraction failed:", err);
       return "Processed Media";
@@ -65,16 +51,13 @@ export default function App() {
     e.preventDefault();
     setError(null);
 
-    if (!url) {
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) {
       setError('Please enter a media URL');
       return;
     }
 
-    const trimmedUrl = url.trim();
-    const isYoutube = getYouTubeId(trimmedUrl);
-    const isValid = /^https?:\/\/.*/.test(trimmedUrl);
-
-    if (!isValid) {
+    if (!/^https?:\/\/.*/.test(trimmedUrl)) {
       setError('Please enter a valid URL starting with http:// or https://');
       return;
     }
@@ -83,17 +66,10 @@ export default function App() {
     setResult(null);
 
     try {
-      // Step 1: AI Metadata Extraction
+      // Step 1: AI Metadata Extraction (Frontend for security context)
       const title = await extractMetadataWithAI(trimmedUrl);
-      
-      // Step 2: Thumbnail Selection
-      let thumbnail = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=250&auto=format&fit=crop";
-      if (isYoutube) {
-        // High quality fallback
-        thumbnail = `https://i.ytimg.com/vi/${isYoutube}/hqdefault.jpg`;
-      }
 
-      // Step 3: Mock Backend for download links (preserving architecture)
+      // Step 2: Backend Processing for download links
       const response = await fetch('/api/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -107,11 +83,10 @@ export default function App() {
 
       const { data } = await response.json();
       
-      // Merge AI Metadata with Backend structure
+      // Update result with AI extracted title
       setResult({
         ...data,
-        title,
-        thumbnail
+        title
       });
     } catch (err: any) {
       console.error("Processing error:", err);
@@ -129,12 +104,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#E5E5E5] selection:bg-indigo-500/30 relative overflow-x-hidden">
-      {/* Dev Status Indicator */}
-      <div className="fixed bottom-4 left-4 z-[100] px-2 py-1 rounded text-[10px] font-mono bg-white/5 border border-white/10 flex items-center gap-2">
-        <div className={`w-2 h-2 rounded-full ${serverStatus === 'ok' ? 'bg-emerald-500' : serverStatus === 'fail' ? 'bg-red-500' : 'bg-amber-500'}`}></div>
-        API Connection: {serverStatus.toUpperCase()}
-      </div>
-
       {/* Background Subtle Glows */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-900/10 rounded-full blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-900/10 rounded-full blur-[120px] pointer-events-none"></div>
