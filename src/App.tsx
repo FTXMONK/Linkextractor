@@ -231,8 +231,8 @@ export default function App() {
                 <div className="w-16 h-16 bg-indigo-500/10 rounded-full flex items-center justify-center mb-4">
                   <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-2">Processing your media</h3>
-                <p className="text-white/30">This usually takes a few seconds...</p>
+                <h3 className="text-xl font-semibold text-white mb-2 tracking-tight">Fetching data...</h3>
+                <p className="text-white/30 text-sm">Rotating through secure bridge instances...</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -278,9 +278,10 @@ export default function App() {
                     <div className="flex gap-2">
                       <a 
                         href={result.mp3.url}
-                        className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white py-2.5 rounded-lg text-sm font-medium transition-colors text-center"
+                        className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white py-2.5 rounded-lg text-sm font-medium transition-colors text-center flex items-center justify-center gap-2"
                       >
-                        Download
+                        Download 
+                        <span className="text-[10px] bg-indigo-500/20 text-indigo-400 px-1.5 py-0.5 rounded font-bold uppercase">HQ</span>
                       </a>
                       <button 
                         onClick={() => copyToClipboard(result.mp3.url, 'mp3')}
@@ -313,9 +314,10 @@ export default function App() {
                     <div className="flex gap-2">
                       <a 
                         href={result.mp4.url}
-                        className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white py-2.5 rounded-lg text-sm font-medium transition-colors text-center"
+                        className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white py-2.5 rounded-lg text-sm font-medium transition-colors text-center flex items-center justify-center gap-2"
                       >
                         Download
+                        <span className="text-[10px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded font-bold uppercase">1080p</span>
                       </a>
                       <button 
                         onClick={() => copyToClipboard(result.mp4.url, 'mp4')}

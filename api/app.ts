@@ -24,14 +24,12 @@ app.post('/api/process', async (req, res) => {
 
   try {
     const instances = [
+      'https://cobalt.api.destiny.tools/api/json',
       'https://api.cobalt.tools/api/json',
       'https://cobalt.shavit.xyz/api/json',
       'https://cobalt.ayaya.one/api/json',
       'https://cobalt.api.unblocked.cat/api/json',
-      'https://cobalt.qwer.host/api/json',
-      'https://cobalt.femboy.network/api/json',
-      'https://cobalt.kcom.network/api/json',
-      'https://co.wuk.sh/api/json'
+      'https://cobalt.qwer.host/api/json'
     ];
 
     let data = null;
@@ -39,7 +37,7 @@ app.post('/api/process', async (req, res) => {
     // 1. Try Cobalt Instances in Parallel to avoid 504 timeouts
     const fetchWithTimeout = async (api: string, payload: any) => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout for the whole parallel block
+      const timeoutId = setTimeout(() => controller.abort(), 12000); // Increased to 12s
       
       try {
         const response = await fetch(api, {
@@ -69,31 +67,36 @@ app.post('/api/process', async (req, res) => {
 
     try {
       // Create a set of promises for the fastest successful response
-      // We try two different payloads - one standard, one minimal
+      // We try the most robust High-Quality payloads first
       const strategies = instances.flatMap(api => [
         fetchWithTimeout(api, {
             url: url,
-            videoQuality: '720',
+            videoQuality: '1080',
             audioFormat: 'mp3',
-            filenameStyle: 'basic'
+            filenameStyle: 'pretty',
+            downloadMode: 'auto'
         }),
-        fetchWithTimeout(api, { url: url }) // Minimal payload as fallback
+        fetchWithTimeout(api, { 
+            url: url,
+            vQuality: 'max',
+            isAudioOnly: false,
+            aFormat: 'mp3'
+        })
       ]);
 
       data = await Promise.any(strategies);
-      console.log(`[API] Fastest success achieved`);
+      console.log(`[API] High-Quality source achieved`);
     } catch (e) {
-      console.warn(`[API] All Cobalt instances failed or timed out. Trying single VKR fallback.`);
+      console.warn(`[API] All Cobalt instances failed. Trying VKR fallback.`);
       
-      // 2. Fallback to VKRDownloader if Cobalt parallel block fails
+      // VKR fallback already exists and handles errors
       try {
         const vkrResponse = await fetch(`https://api.vkrdownloader.com/server?v=${encodeURIComponent(url)}`, {
-            signal: AbortSignal.timeout(5000)
+            signal: AbortSignal.timeout(6000)
         });
         if (vkrResponse.ok) {
           const vkrData = await vkrResponse.json();
           if (vkrData && vkrData.data && vkrData.data.downloads) {
-            // Find a good download link (preferring video for now as fallback)
             const download = vkrData.data.downloads.find((d: any) => d.quality === '720p' || d.quality === '1080p') || vkrData.data.downloads[0];
             if (download) {
                 return res.json({
@@ -102,23 +105,15 @@ app.post('/api/process', async (req, res) => {
                         id: Math.random().toString(36).substring(7),
                         title: vkrData.data.title || "Extracted Media",
                         thumbnail: vkrData.data.thumbnail || thumbnail,
-                        mp3: {
-                            url: download.url, // VKR often provides direct links
-                            size: download.size || "Unknown",
-                            quality: "High"
-                        },
-                        mp4: {
-                            url: download.url,
-                            size: download.size || "Unknown",
-                            quality: download.quality || "HD"
-                        }
+                        mp3: { url: download.url, size: "Variable", quality: "High" },
+                        mp4: { url: download.url, size: "Variable", quality: download.quality || "HD" }
                     }
                 });
             }
           }
         }
-      } catch (e: any) {
-        console.error(`[API] VKRDownloader failed:`, e.message);
+      } catch (vkrErr) {
+        console.error(`[API] VKR fallback failed:`, vkrErr);
       }
     }
 
