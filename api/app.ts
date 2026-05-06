@@ -26,37 +26,88 @@ app.post('/api/process', async (req, res) => {
     const instances = [
       'https://api.cobalt.tools/api/json',
       'https://cobalt.shavit.xyz/api/json',
-      'https://cobalt.ayaya.one/api/json'
+      'https://cobalt.ayaya.one/api/json',
+      'https://cobalt.api.unblocked.cat/api/json',
+      'https://cobalt.shavit.xyz/api/json',
+      'https://co.wuk.sh/api/json'
     ];
 
     let data = null;
-    let lastError = null;
-
+    
+    // 1. Try Cobalt Instances with multiple payload strategies
     for (const api of instances) {
-      try {
-        const cobaltResponse = await fetch(api, {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            url: url,
-            videoQuality: '1080',
-            filenameStyle: 'basic',
-            downloadMode: 'auto'
-          })
-        });
+      if (data) break;
 
-        if (cobaltResponse.ok) {
-          data = await cobaltResponse.json();
-          if (data.status === 'stream' || data.status === 'success' || data.status === 'redirect') {
-            break;
+      const strategies = [
+        { url, videoQuality: '720', audioFormat: 'mp3', filenameStyle: 'basic' }, // Latest v10
+        { url, vQuality: '720', aFormat: 'mp3' }, // Older v7 fallback
+        { url } // Absolute minimal
+      ];
+
+      for (const payload of strategies) {
+        try {
+          console.log(`[API] Trying ${api} with strategy ${Object.keys(payload).length === 1 ? 'minimal' : 'standard'}`);
+          const cobaltResponse = await fetch(api, {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(10000)
+          });
+
+          if (cobaltResponse.ok) {
+            const resData = await cobaltResponse.json();
+            if (resData.status === 'stream' || resData.status === 'success' || resData.status === 'redirect') {
+              data = resData;
+              console.log(`[API] Success from ${api}`);
+              break;
+            }
+          }
+        } catch (e: any) {
+          continue;
+        }
+      }
+    }
+
+    // 2. Fallback to VKRDownloader if Cobalt fails
+    if (!data) {
+      try {
+        console.log(`[API] Trying VKRDownloader fallback`);
+        const vkrResponse = await fetch(`https://api.vkrdownloader.com/server?v=${encodeURIComponent(url)}`, {
+            signal: AbortSignal.timeout(10000)
+        });
+        if (vkrResponse.ok) {
+          const vkrData = await vkrResponse.json();
+          if (vkrData && vkrData.data && vkrData.data.downloads) {
+            // Find a good download link (preferring video for now as fallback)
+            const download = vkrData.data.downloads.find((d: any) => d.quality === '720p' || d.quality === '1080p') || vkrData.data.downloads[0];
+            if (download) {
+                return res.json({
+                    success: true,
+                    data: {
+                        id: Math.random().toString(36).substring(7),
+                        title: vkrData.data.title || "Extracted Media",
+                        thumbnail: vkrData.data.thumbnail || thumbnail,
+                        mp3: {
+                            url: download.url, // VKR often provides direct links
+                            size: download.size || "Unknown",
+                            quality: "High"
+                        },
+                        mp4: {
+                            url: download.url,
+                            size: download.size || "Unknown",
+                            quality: download.quality || "HD"
+                        }
+                    }
+                });
+            }
           }
         }
-      } catch (e) {
-        lastError = e;
-        continue;
+      } catch (e: any) {
+        console.error(`[API] VKRDownloader failed:`, e.message);
       }
     }
 
