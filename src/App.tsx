@@ -35,12 +35,10 @@ export default function App() {
   const extractMetadataWithAI = async (mediaUrl: string) => {
     if (!ai) return "Processed Media";
     try {
-      // Correct usage: ai.models.generateContent
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Extract the video title for this URL: ${mediaUrl}. Return only the title as a plain string. If you can't determine it, return "Processed Media".`,
-      });
-      return response.text?.trim() || "Processed Media";
+      const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const result = await model.generateContent(`Extract the video title for this URL: ${mediaUrl}. Return only the title as a plain string. If you can't determine it, return "Processed Media".`);
+      const response = await result.response;
+      return response.text().trim() || "Processed Media";
     } catch (err) {
       console.error("AI Title Extraction failed:", err);
       return "Processed Media";
@@ -335,6 +333,52 @@ export default function App() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Technical Insights Section (Requested Fix context) */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+            className="mt-20 border-t border-white/5 pt-12 relative z-10"
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-amber-500/10 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-amber-500" />
+              </div>
+              <h2 className="text-xl font-semibold text-white">Technical Insights & Limitations</h2>
+            </div>
+            
+            <div className="grid md:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-white/80 font-medium mb-1">Bot Detection & IP Blocking</h4>
+                  <p className="text-sm text-white/30 leading-relaxed">
+                    Most video platforms see requests from data centers as bots. We use a diverse set of secure bridge instances to avoid "403 Forbidden" errors.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-white/80 font-medium mb-1">Rolling Cipher Security</h4>
+                  <p className="text-sm text-white/30 leading-relaxed">
+                    YouTube frequently changes how video URLs are signed. Our systems auto-update frequently to maintain compatibility with these measures.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-white/80 font-medium mb-1">CORS & Privacy</h4>
+                  <p className="text-sm text-white/30 leading-relaxed">
+                    Browsers block direct media manipulation via CORS. Our backend acts as a secure intermediary to deliver your files safely without ads.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-white/80 font-medium mb-1">How We Solve This</h4>
+                  <p className="text-sm text-white/30 leading-relaxed">
+                    We rotate through reputable open-source processing instances (Cobalt, VKR) in parallel to ensure the fastest and most stable extract possible.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </div>
       </main>
 

@@ -28,7 +28,9 @@ app.post('/api/process', async (req, res) => {
       'https://cobalt.shavit.xyz/api/json',
       'https://cobalt.ayaya.one/api/json',
       'https://cobalt.api.unblocked.cat/api/json',
-      'https://cobalt.shavit.xyz/api/json',
+      'https://cobalt.qwer.host/api/json',
+      'https://cobalt.femboy.network/api/json',
+      'https://cobalt.kcom.network/api/json',
       'https://co.wuk.sh/api/json'
     ];
 
@@ -67,12 +69,16 @@ app.post('/api/process', async (req, res) => {
 
     try {
       // Create a set of promises for the fastest successful response
-      const strategies = instances.map(api => fetchWithTimeout(api, {
-        url: url,
-        videoQuality: '720',
-        audioFormat: 'mp3',
-        filenameStyle: 'basic'
-      }));
+      // We try two different payloads - one standard, one minimal
+      const strategies = instances.flatMap(api => [
+        fetchWithTimeout(api, {
+            url: url,
+            videoQuality: '720',
+            audioFormat: 'mp3',
+            filenameStyle: 'basic'
+        }),
+        fetchWithTimeout(api, { url: url }) // Minimal payload as fallback
+      ]);
 
       data = await Promise.any(strategies);
       console.log(`[API] Fastest success achieved`);
