@@ -34,50 +34,55 @@ app.post('/api/process', async (req, res) => {
 
     let data = null;
     
-    // 1. Try Cobalt Instances with multiple payload strategies
-    for (const api of instances) {
-      if (data) break;
-
-      const strategies = [
-        { url, videoQuality: '720', audioFormat: 'mp3', filenameStyle: 'basic' }, // Latest v10
-        { url, vQuality: '720', aFormat: 'mp3' }, // Older v7 fallback
-        { url } // Absolute minimal
-      ];
-
-      for (const payload of strategies) {
-        try {
-          console.log(`[API] Trying ${api} with strategy ${Object.keys(payload).length === 1 ? 'minimal' : 'standard'}`);
-          const cobaltResponse = await fetch(api, {
-            method: 'POST',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            },
-            body: JSON.stringify(payload),
-            signal: AbortSignal.timeout(10000)
-          });
-
-          if (cobaltResponse.ok) {
-            const resData = await cobaltResponse.json();
-            if (resData.status === 'stream' || resData.status === 'success' || resData.status === 'redirect') {
-              data = resData;
-              console.log(`[API] Success from ${api}`);
-              break;
-            }
-          }
-        } catch (e: any) {
-          continue;
-        }
-      }
-    }
-
-    // 2. Fallback to VKRDownloader if Cobalt fails
-    if (!data) {
+    // 1. Try Cobalt Instances in Parallel to avoid 504 timeouts
+    const fetchWithTimeout = async (api: string, payload: any) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout for the whole parallel block
+      
       try {
-        console.log(`[API] Trying VKRDownloader fallback`);
+        const response = await fetch(api, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const resData = await response.json();
+          if (resData.status === 'stream' || resData.status === 'success' || resData.status === 'redirect') {
+            return resData;
+          }
+        }
+        throw new Error('Invalid response');
+      } catch (e) {
+        clearTimeout(timeoutId);
+        throw e;
+      }
+    };
+
+    try {
+      // Create a set of promises for the fastest successful response
+      const strategies = instances.map(api => fetchWithTimeout(api, {
+        url: url,
+        videoQuality: '720',
+        audioFormat: 'mp3',
+        filenameStyle: 'basic'
+      }));
+
+      data = await Promise.any(strategies);
+      console.log(`[API] Fastest success achieved`);
+    } catch (e) {
+      console.warn(`[API] All Cobalt instances failed or timed out. Trying single VKR fallback.`);
+      
+      // 2. Fallback to VKRDownloader if Cobalt parallel block fails
+      try {
         const vkrResponse = await fetch(`https://api.vkrdownloader.com/server?v=${encodeURIComponent(url)}`, {
-            signal: AbortSignal.timeout(10000)
+            signal: AbortSignal.timeout(5000)
         });
         if (vkrResponse.ok) {
           const vkrData = await vkrResponse.json();
